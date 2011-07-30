@@ -12,9 +12,9 @@ module CASClient
       end
 
       if doc.elements && doc.elements["cas:serviceResponse"]
-        return (2.0, doc.elements["cas:serviceResponse"].elements[1])
+        return [2, doc.elements["cas:serviceResponse"].elements[1]]
       elsif doc.elements && doc.elements["SOAP-ENV:Envelope"]
-        return (3.0, doc.elements["Response"]
+        return [3, doc.elements["//Response"]]
       else
         raise BadResponseException,
           "This does not appear to be a valid CAS response (missing cas:serviceResponse root element)!\nXML DOC:\n#{doc.to_s}"
@@ -52,13 +52,9 @@ module CASClient
       # if we got this far then we've got a valid XML response, so we're doing CAS 2.0
       @protocol, @xml = check_and_parse_xml(raw_text)
 
-      puts @protocol
-      puts @xml
-
       if is_success?
-        cas_user = @protocol == 2.0 ? @xml.elements["cas:user"] : @xml.elements["NameIdentifier"]
+        cas_user = @protocol == 2 ? @xml.elements["cas:user"] : @xml.elements["//NameIdentifier"]
         @user = cas_user.text.strip if cas_user
-        puts @user
         @pgt_iou =  @xml.elements["cas:proxyGrantingTicket"].text.strip if @xml.elements["cas:proxyGrantingTicket"]
 
         proxy_els = @xml.elements.to_a('//cas:authenticationSuccess/cas:proxies/cas:proxy')
@@ -75,11 +71,10 @@ module CASClient
           el.namespaces.each {|k,v| el.add_namespace(k,v)}
           @extra_attributes.merge!(Hash.from_xml(el.to_s)) unless (el == cas_user)
         end
-        @xml.elements.to_a('Attribute').each do |el|
+        @xml.elements.to_a('//Attribute').each do |el|
           key = el.attributes["AttributeName"]
-          @extra_attributes[key] = el["AttributeValue"].text
+          @extra_attributes[key] = el.elements["AttributeValue"].text.strip
         end
-        puts @extra_attributes
 
         # unserialize extra attributes
         @extra_attributes.each do |k, v|
@@ -90,8 +85,13 @@ module CASClient
           end
         end
       elsif is_failure?
-        @failure_code = @xml.elements['//cas:authenticationFailure'].attributes['code']
-        @failure_message = @xml.elements['//cas:authenticationFailure'].text.strip
+        if protocol == 2
+          @failure_code = @xml.elements['//cas:authenticationFailure'].attributes['code']
+          @failure_message = @xml.elements['//cas:authenticationFailure'].text.strip
+        else
+          @failure_code = 0
+          @failure_message = @xml.elements['//StatusMessage'].text.strip
+        end
       else
         # this should never happen, since the response should already have been recognized as invalid
         raise BadResponseException, "BAD CAS RESPONSE:\n#{raw_text.inspect}\n\nXML DOC:\n#{doc.inspect}"
@@ -100,11 +100,15 @@ module CASClient
     end
 
     def is_success?
-      (instance_variable_defined?(:@valid) &&  @valid) || (protocol > 1.0 && xml.name == "authenticationSuccess")
+      (instance_variable_defined?(:@valid) &&  @valid) ||
+        (protocol == 2 && xml.name == "authenticationSuccess") ||
+        (protocol == 3 && xml.elements["//StatusCode"].attributes["Value"] == "samlp:Success")
     end
 
     def is_failure?
-      (instance_variable_defined?(:@valid) && !@valid) || (protocol > 1.0 && xml.name == "authenticationFailure" )
+      (instance_variable_defined?(:@valid) && !@valid) ||
+        (protocol == 2 && xml.name == "authenticationFailure" ) ||
+        (protocol == 3 && xml.elements["//StatusCode"].attributes["Value"] != "samlp:Success")
     end
   end
 

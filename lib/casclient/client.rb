@@ -83,6 +83,10 @@ module CASClient
     end
 
     def validate_service_ticket(st)
+      if validate_url.include? "saml"
+        return validate_saml_ticket(st)
+      end
+ 
       uri = URI.parse(validate_url)
       h = uri.query ? query_to_hash(uri.query) : {}
       h['service'] = st.service
