@@ -83,7 +83,7 @@ module CASClient
         #  else
         #    @extra_attributes[k] = YAML.load(v)
         #  end
-        end
+        #end
       elsif is_failure?
         if protocol == 2
           @failure_code = @xml.elements['//cas:authenticationFailure'].attributes['code']
