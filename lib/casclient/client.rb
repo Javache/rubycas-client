@@ -98,7 +98,7 @@ module CASClient
     alias validate_proxy_ticket validate_service_ticket
 
     def validate_saml_ticket(st)
-      uri = (cas_base_url + "/proxyValidate")
+      uri = URI.parse(validate_url)
       h = uri.query ? query_to_hash(uri.query) : {}
       h['TARGET'] = st.service
       uri.query = hash_to_query(h)
@@ -110,13 +110,13 @@ module CASClient
           <samlp:Request xmlns:samlp="urn:oasis:names:tc:SAML:1.0:protocol"
                          MajorVersion="1"
                          MinorVersion="1"
-                         RequestID="_blah_%d"
+                         RequestID="_127.0.0.1.%d"
                          IssueInstant="%s">
             <samlp:AssertionArtifact>%s</samlp:AssertionArtifact>
           </samlp:Request>
         </SOAP-ENV:Body>
       </SOAP-ENV:Envelope>'
-      request = xml.sprintf(Time.now.to_i, st.ticket, Time.now.iso8601)
+      request = format(xml, Time.now.to_i, Time.now.iso8601, st.ticket)
 
       st.response = request_cas_response(uri, ValidationResponse, request)
 
@@ -249,7 +249,7 @@ module CASClient
       https.verify_mode = (@force_ssl_verification ? OpenSSL::SSL::VERIFY_PEER : OpenSSL::SSL::VERIFY_NONE)
 
       if data
-        req = Net::HTTP::Post.new(uri.path)
+        req = Net::HTTP::Post.new("#{uri.path}?#{uri.query}")
         req.set_content_type 'text/xml'
         req.body = data
       end
