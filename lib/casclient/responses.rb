@@ -77,12 +77,12 @@ module CASClient
         end
 
         # unserialize extra attributes
-        @extra_attributes.each do |k, v|
-          if v.blank?
-            @extra_attributes[k] = nil
-          else
-            @extra_attributes[k] = YAML.load(v)
-          end
+        #@extra_attributes.each do |k, v|
+        #  if v.blank?
+        #    @extra_attributes[k] = nil
+        #  else
+        #    @extra_attributes[k] = YAML.load(v)
+        #  end
         end
       elsif is_failure?
         if protocol == 2
